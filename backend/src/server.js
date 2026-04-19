@@ -14,6 +14,11 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Server is running!' });
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/fields', fieldRoutes);
@@ -33,6 +38,7 @@ const initDatabase = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    console.log('✅ Users table ready');
 
     // Fields table
     await pool.query(`
@@ -48,6 +54,7 @@ const initDatabase = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    console.log('✅ Fields table ready');
 
     // Field updates table
     await pool.query(`
@@ -61,14 +68,16 @@ const initDatabase = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    console.log('✅ Field updates table ready');
 
-    console.log('Database initialized');
+    console.log('🎉 Database initialized successfully!');
   } catch (error) {
-    console.error('Database initialization error:', error);
+    console.error('❌ Database initialization error:', error.message);
   }
 };
 
+// Start server
 app.listen(PORT, async () => {
   await initDatabase();
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
