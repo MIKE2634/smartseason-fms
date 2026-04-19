@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 
-const API_URL = 'https://smartseason-api.onrender.com/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://smartseason-api.onrender.com/api';
 
 function Fields() {
   const { user } = useAuth();
@@ -11,6 +11,8 @@ function Fields() {
   const [agents, setAgents] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingField, setEditingField] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     crop_type: '',
@@ -18,7 +20,6 @@ function Fields() {
     current_stage: 'Planted',
     assigned_agent_id: '',
   });
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchFields();
@@ -29,10 +30,15 @@ function Fields() {
 
   const fetchFields = async () => {
     try {
-      const response = await axios.get(`${API_URL}/fields`);
+      setLoading(true);
+      const response = await axios.get(`${API_URL}/fields`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
       setFields(response.data);
+      setError('');
     } catch (error) {
       console.error('Error fetching fields:', error);
+      setError('Failed to load fields. Please refresh the page.');
     } finally {
       setLoading(false);
     }
@@ -40,7 +46,9 @@ function Fields() {
 
   const fetchAgents = async () => {
     try {
-      const response = await axios.get(`${API_URL}/fields/agents`);
+      const response = await axios.get(`${API_URL}/fields/agents`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
       setAgents(response.data);
     } catch (error) {
       console.error('Error fetching agents:', error);
@@ -49,29 +57,53 @@ function Fields() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    
     try {
+      // Prepare data - convert empty string to null for agent
+      const submitData = {
+        name: formData.name,
+        crop_type: formData.crop_type,
+        planting_date: formData.planting_date,
+        current_stage: formData.current_stage,
+        assigned_agent_id: formData.assigned_agent_id === '' ? null : parseInt(formData.assigned_agent_id),
+      };
+      
       if (editingField) {
-        await axios.put(`${API_URL}/fields/${editingField.id}`, formData);
+        await axios.put(`${API_URL}/fields/${editingField.id}`, submitData, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
       } else {
-        await axios.post(`${API_URL}/fields`, formData);
+        await axios.post(`${API_URL}/fields`, submitData, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
       }
+      
       setShowModal(false);
       resetForm();
       fetchFields();
     } catch (error) {
       console.error('Error saving field:', error);
-      alert('Error saving field');
+      if (error.response?.data?.error) {
+        setError(error.response.data.error);
+      } else if (error.response?.data?.errors) {
+        setError(error.response.data.errors.map(e => e.msg).join(', '));
+      } else {
+        setError('Error saving field. Please try again.');
+      }
     }
   };
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this field?')) {
       try {
-        await axios.delete(`${API_URL}/fields/${id}`);
+        await axios.delete(`${API_URL}/fields/${id}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
         fetchFields();
       } catch (error) {
         console.error('Error deleting field:', error);
-        alert('Error deleting field');
+        setError('Error deleting field. Please try again.');
       }
     }
   };
@@ -85,6 +117,7 @@ function Fields() {
       current_stage: 'Planted',
       assigned_agent_id: '',
     });
+    setError('');
   };
 
   const editField = (field) => {
@@ -125,8 +158,14 @@ function Fields() {
         )}
       </div>
 
+      {error && (
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-md">
+          {error}
+        </div>
+      )}
+
       {loading ? (
-        <div className="text-center text-gray-500">Loading...</div>
+        <div className="text-center text-gray-500 py-12">Loading fields...</div>
       ) : fields.length === 0 ? (
         <div className="text-center text-gray-500 py-12">
           No fields found. {user.role === 'admin' && 'Click "New Field" to get started.'}
@@ -187,23 +226,28 @@ function Fields() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">{editingField ? 'Edit Field' : 'New Field'}</h2>
+            {error && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-md text-sm">
+                {error}
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Field Name *</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Crop Type</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Crop Type *</label>
                 <select
                   value={formData.crop_type}
                   onChange={(e) => setFormData({ ...formData, crop_type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   required
                 >
                   <option value="">Select crop</option>
@@ -216,21 +260,21 @@ function Fields() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Planting Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Planting Date *</label>
                 <input
                   type="date"
                   value={formData.planting_date}
                   onChange={(e) => setFormData({ ...formData, planting_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Current Stage</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current Stage *</label>
                 <select
                   value={formData.current_stage}
                   onChange={(e) => setFormData({ ...formData, current_stage: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   required
                 >
                   <option value="Planted">Planted</option>
@@ -249,7 +293,7 @@ function Fields() {
                   >
                     <option value="">Unassigned</option>
                     {agents.map((agent) => (
-                      <option key={agent.id} value={agent.id}>{agent.name}</option>
+                      <option key={agent.id} value={agent.id}>{agent.name} ({agent.email})</option>
                     ))}
                   </select>
                 </div>
