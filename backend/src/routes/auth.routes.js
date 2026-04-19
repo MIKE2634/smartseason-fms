@@ -56,7 +56,7 @@ router.post('/register', [
   }
 });
 
-// Login - WITH HARDCODED ADMIN BYPASS
+// Login - NO HARDCODED ADMIN - Uses database only
 router.post('/login', [
   body('email').isEmail(),
   body('password').notEmpty(),
@@ -68,28 +68,6 @@ router.post('/login', [
 
   const { email, password } = req.body;
 
-  // ============================================
-  // HARDCODED ADMIN BYPASS - This ALWAYS works!
-  // ============================================
-  if (email === 'admin@shambarecords.com' && password === 'admin123') {
-    console.log('✅ Hardcoded admin login successful');
-    const token = jwt.sign(
-      { id: 999, email: 'admin@shambarecords.com', role: 'admin' },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-    return res.json({
-      user: {
-        id: 999,
-        email: 'admin@shambarecords.com',
-        name: 'Admin Coordinator',
-        role: 'admin'
-      },
-      token
-    });
-  }
-
-  // Normal database login for other users
   try {
     const result = await pool.query(
       'SELECT id, email, password_hash, name, role FROM users WHERE email = $1',
