@@ -9,9 +9,16 @@ import updateRoutes from './routes/update.routes.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 1000;
+const PORT = process.env.PORT || 5000;  // Render will override this with 10000
 
-app.use(cors());
+// Configure CORS for production
+app.use(cors({
+  origin: '*',  // Allow all origins for testing
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
 // Health check endpoint

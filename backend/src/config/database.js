@@ -24,10 +24,7 @@ export const pool = new Pool({
 pool.connect((err, client, release) => {
   if (err) {
     console.error('❌ Database connection error:', err.message);
-    console.error('Please check your environment variables:');
-    console.error('DB_HOST:', process.env.DB_HOST);
-    console.error('DB_USER:', process.env.DB_USER);
-    console.error('DB_NAME:', process.env.DB_NAME);
+    console.error('Please check your environment variables');
   } else {
     console.log('✅ Database connected successfully!');
     release();
