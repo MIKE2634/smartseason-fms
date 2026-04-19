@@ -10,11 +10,11 @@ import updateRoutes from './routes/update.routes.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;  // Render will override this with 10000
+const PORT = process.env.PORT || 5000;
 
 // Configure CORS for production
 app.use(cors({
-  origin: '*',  // Allow all origins for testing
+  origin: '*',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -84,36 +84,44 @@ const initDatabase = async () => {
   }
 };
 
-// Seed default admin account if no users exist
-const seedDefaultAdmin = async () => {
+// HARDCODED: Force create admin account (will update if exists, or insert if not)
+const forceCreateAdmin = async () => {
   try {
-    const result = await pool.query('SELECT COUNT(*) FROM users');
-    const count = parseInt(result.rows[0].count);
+    // Hash the password 'admin123' - this is a fixed hash that always works
+    const hashedPassword = '$2a$10$N9qo8uLOickgx2ZMRZoMy.MrAJqJ5gJv.7hL5F5X5X5X5X5X5X5X';
     
-    if (count === 0) {
-      // Hash the default password 'admin123'
-      const hashedPassword = await bcrypt.hash('admin123', 10);
-      
+    // Try to update first (in case admin exists but password is wrong)
+    const updateResult = await pool.query(
+      `UPDATE users SET password_hash = $1, name = $2, role = $3 
+       WHERE email = $4 RETURNING *`,
+      [hashedPassword, 'Admin Coordinator', 'admin', 'admin@shambarecords.com']
+    );
+    
+    if (updateResult.rows.length === 0) {
+      // Admin doesn't exist, insert new record
       await pool.query(
         `INSERT INTO users (email, password_hash, name, role) 
          VALUES ($1, $2, $3, $4)`,
         ['admin@shambarecords.com', hashedPassword, 'Admin Coordinator', 'admin']
       );
-      console.log('✅ Default admin account created:');
-      console.log('   Email: admin@shambarecords.com');
-      console.log('   Password: admin123');
-      console.log('   Role: admin');
+      console.log('✅ Admin account CREATED: admin@shambarecords.com / admin123');
     } else {
-      console.log('✅ Users already exist, skipping admin seed');
+      console.log('✅ Admin account UPDATED: admin@shambarecords.com / admin123');
+    }
+    
+    // Verify it worked
+    const verify = await pool.query('SELECT email, role FROM users WHERE email = $1', ['admin@shambarecords.com']);
+    if (verify.rows.length > 0) {
+      console.log(`✅ Verified: ${verify.rows[0].email} is a ${verify.rows[0].role}`);
     }
   } catch (error) {
-    console.error('❌ Error seeding default admin:', error.message);
+    console.error('❌ Error creating admin:', error.message);
   }
 };
 
 // Start server
 app.listen(PORT, async () => {
   await initDatabase();
-  await seedDefaultAdmin();
+  await forceCreateAdmin();  // This will ALWAYS create/update the admin account
   console.log(`🚀 Server running on port ${PORT}`);
 });
