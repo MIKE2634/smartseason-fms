@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import bcrypt from 'bcryptjs';
 import { pool } from './config/database.js';
 import authRoutes from './routes/auth.routes.js';
 import fieldRoutes from './routes/field.routes.js';
@@ -83,8 +84,36 @@ const initDatabase = async () => {
   }
 };
 
+// Seed default admin account if no users exist
+const seedDefaultAdmin = async () => {
+  try {
+    const result = await pool.query('SELECT COUNT(*) FROM users');
+    const count = parseInt(result.rows[0].count);
+    
+    if (count === 0) {
+      // Hash the default password 'admin123'
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      
+      await pool.query(
+        `INSERT INTO users (email, password_hash, name, role) 
+         VALUES ($1, $2, $3, $4)`,
+        ['admin@shambarecords.com', hashedPassword, 'Admin Coordinator', 'admin']
+      );
+      console.log('✅ Default admin account created:');
+      console.log('   Email: admin@shambarecords.com');
+      console.log('   Password: admin123');
+      console.log('   Role: admin');
+    } else {
+      console.log('✅ Users already exist, skipping admin seed');
+    }
+  } catch (error) {
+    console.error('❌ Error seeding default admin:', error.message);
+  }
+};
+
 // Start server
 app.listen(PORT, async () => {
   await initDatabase();
+  await seedDefaultAdmin();
   console.log(`🚀 Server running on port ${PORT}`);
 });
