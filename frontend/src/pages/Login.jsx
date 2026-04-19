@@ -28,16 +28,26 @@ function Login() {
           role,
         });
         login(response.data.user, response.data.token);
+        navigate('/');
       } else {
         const response = await axios.post(`${API_URL}/auth/login`, {
           email,
           password,
         });
         login(response.data.user, response.data.token);
+        navigate('/');
       }
-      navigate('/');
     } catch (err) {
-      setError(err.response?.data?.error || 'An error occurred');
+      console.error('API Error:', err);
+      if (err.code === 'ERR_NETWORK') {
+        setError('Cannot connect to server. Backend may be starting up. Please wait 30 seconds and try again.');
+      } else if (err.response?.status === 401) {
+        setError('Invalid email or password');
+      } else if (err.response?.status === 400) {
+        setError(err.response.data?.error || 'Invalid input');
+      } else {
+        setError(err.response?.data?.error || 'An error occurred. Please try again.');
+      }
     }
   };
 
@@ -99,7 +109,9 @@ function Login() {
           </div>
           
           {error && (
-            <div className="text-red-600 text-sm">{error}</div>
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-md text-sm">
+              {error}
+            </div>
           )}
           
           <button
