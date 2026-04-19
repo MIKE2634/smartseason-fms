@@ -20,16 +20,12 @@ router.post('/register', [
   const { email, password, name } = req.body;
 
   try {
-    // Check if email already exists
     const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       return res.status(400).json({ error: 'Email already exists' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-    
-    // New users always get 'agent' role
     const role = 'agent';
     
     const result = await pool.query(
@@ -56,7 +52,7 @@ router.post('/register', [
   }
 });
 
-// Login - NO HARDCODED ADMIN - Uses database only
+// Login - WITH HARDCODED ADMIN BYPASS (using real admin ID 7)
 router.post('/login', [
   body('email').isEmail(),
   body('password').notEmpty(),
@@ -68,6 +64,28 @@ router.post('/login', [
 
   const { email, password } = req.body;
 
+  // ============================================
+  // HARDCODED ADMIN BYPASS - Uses real admin ID 7
+  // ============================================
+  if (email === 'admin@shambarecords.com' && password === 'admin123') {
+    console.log('✅ Hardcoded admin login successful (ID: 7)');
+    const token = jwt.sign(
+      { id: 7, email: 'admin@shambarecords.com', role: 'admin' },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    return res.json({
+      user: {
+        id: 7,
+        email: 'admin@shambarecords.com',
+        name: 'Admin Coordinator',
+        role: 'admin'
+      },
+      token
+    });
+  }
+
+  // Normal database login for other users
   try {
     const result = await pool.query(
       'SELECT id, email, password_hash, name, role FROM users WHERE email = $1',
